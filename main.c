@@ -9,7 +9,7 @@ void USART_Init(unsigned int baud){
     //Assign remaining baud number
     UBRRL = (unsigned char)baud;
  
-    //Enable reciever and transmiter
+    //Enable receiver and transmitter
     UCSRB = (1<<RXEN)|(1<<TXEN);
  
     //Initialize to 8 data bits 1 stop bit
@@ -71,7 +71,7 @@ unsigned int USART_Receive(void){
 }
  
 unsigned int USART_Transmit(unsigned int data){
-    //Wait for tansmiter
+    //Wait for transmitter
     while(!(UCSRA & (1<<UDRE))){}
  
     //Write data to USART buffer
@@ -82,8 +82,8 @@ int main(void){
     UBRRH=0x00;
     UBRRL=0x07;
     USART_Init(UBRRL);
-    DDRA = 0x00; //make all ports input
-    DDRB=0xFF;   //make all ports output
+    DDRA = 0x00; //Make all ports input
+    DDRB=0xFF;   //Make all ports output
     PORTB =0x00;
  
    // while(1){
