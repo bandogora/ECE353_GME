@@ -1,8 +1,125 @@
+/* Project: General MIDI Explorer 
+ * 
+ * Description: 
+ * 
+ * Date: 10/29/2018
+ * 
+ * Written by:
+ * 		Samuel Burgess
+ *		Justin Forgue
+ *		Aric Pennington
+ *		Elias Phillips
+ */
+
+
 #include <util/delay.h>
 #include <avr/io.h>
 #include <avr/eeprom.h>
 #include <avr/interrupt.h>
 
+void USART_Init(unsigned int baud);
+void port_Init();
+unsigned int ADCRead (unsigned int volt);
+void EEPROM_Write(unsigned int address, unsigned char data);
+unsigned char EEPROM_Read(unsigned int address);
+int isRecordOn();
+int isPlayOn();
+int isModifyOn();
+unsigned char USART_Receive(void);
+void USART_Transmit(unsigned char data);
+void USART_Flush(void);
+
+int main(void){
+    //set baud rate
+    unsigned int baud = 0x07;
+    USART_Init(baud);
+    USART_Flush();
+
+	port_Init();
+
+
+    unsigned int writeAddress = 0;
+    unsigned int readAddress = 0;
+    unsigned char data[3];
+    unsigned int noteCount = 0;
+	unsigned int notePlay = 0;
+	uint16_t time = 0;
+	float modifier;
+
+    
+	while(1){
+		if(isRecordOn()){
+		USART_Init(0x07);
+			writeAddress = 0;
+			noteCount = 0;
+			TCNT1 = 0;
+			USART_Flush();
+            notePlay = 0;
+            time =0;
+            //Reset address at start of record
+            //Record until eeprom is full or is switched off
+            while((writeAddress<1022U) && isRecordOn()){
+                for(unsigned int i=0;i<3;i++){
+                    //Store each of the three MIDI bytes in EEPROM	
+					data[i] = USART_Receive();
+                    EEPROM_Write(writeAddress,data[i]);
+					writeAddress++;
+					if(i==2){
+						EEPROM_Write(1023,noteCount++);
+						time=TCNT1;
+						EEPROM_Write(writeAddress++,(time));
+                    	EEPROM_Write(writeAddress++,time>>8);
+						TCNT1 = 0;
+					}
+					//At the end of the midi signal add the timing info to the next two bytes in eeprom
+                    PORTB = data[1];
+        		}
+    		}
+		}
+
+        if(isPlayOn()){
+		    USART_Init(0x07);
+		    readAddress = 0;
+			notePlay=0;
+			noteCount=EEPROM_Read(1023);
+			USART_Flush();
+			time = 0;
+		
+            while (notePlay < noteCount && isPlayOn()){
+			    //read each of the three MIDI bytes from the EEPROM
+				for(unsigned int j=0;j<3;j++){
+                	data[j] = EEPROM_Read(readAddress);
+					USART_Transmit(EEPROM_Read(readAddress));
+					readAddress++;
+                }
+				//creating a 16 bit time value from 2 eeprom bytes (the second note)
+				time = EEPROM_Read(readAddress+5)|(EEPROM_Read(readAddress+6)<<8);
+				if(isModifyOn()){
+					modifier = ADCRead(PINA & (1 << PA7));
+					modifier = 2 * (modifier / 1024);
+					time *= modifier;
+				}	
+					//delay by found time
+					TCNT1 = 0;
+					while(TCNT1<time){}
+					readAddress+=2;
+
+				PORTB = data[1];
+				notePlay++;
+            }
+			// Causes extra light flash
+			_delay_ms(1000);
+        }
+		    PORTB = 0;
+    }
+}
+
+
+/*
+ * Function: USART_Init
+ *  
+ * 		Initialize the USART 
+ */
 void USART_Init(unsigned int baud){
     //Assign upper part of baud number (bits 8 to 11)
     UBRRH = (unsigned char)(baud>>8);
@@ -16,6 +133,35 @@ void USART_Init(unsigned int baud){
     //Initialize to 8 data bits 1 stop bit
     UCSRC = (1<<URSEL)|(3<<UCSZ0);
 
+}
+
+void port_Init(){
+	//Make all ports input
+    DDRA = 0x00;
+
+	//Make all ports output
+    DDRB = 0xFF;
+
+    PORTB = 0x00;
+
+    TCCR1B |= (1<<CS12);  //Prescaler = 256
+	TCNT1 = 0;			//Timer set to zero
+	TIMSK = (1<<OCIE1A); //Enable timer1 overflow interrupt(TOIE1)
+	OCR1A = 12499;
+
+	//Set ADCSRA ( ADC sample rate ) to 32 prescale = 4MHz/32 = 125KHz
+	ADCSRA |= (1 << ADPS2) | (1 << ADPS0);
+
+	//Set ADC reference voltage to AVCC
+	ADMUX = (1 << REFS0);
+
+	//Select Pin A7
+	ADMUX |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
+
+	//Enable the ADC
+	ADCSRA |= 1<<ADEN | 0<<ADSC;
+
+	sei();//Enable global interrupts
 }
 
 ISR(TIMER1_COMPA_vect){
@@ -113,109 +259,3 @@ void USART_Flush(void){
     while (UCSRA & (1<<RXC)) dummy = UDR;
 }
 
-
-
-int main(void){
-    //set baud rate
-    unsigned int baud = 0x07;
-    USART_Init(baud);
-    USART_Flush();
-
-    DDRA = 0x00;            //Make all ports input
-    DDRB = 0xFF;            //Make all ports output
-    PORTB = 0x00;
-
-    TCCR1B |= (1<<CS12);  //Prescaler = 256
-	TCNT1 = 0;			//Timer set to zero
-	TIMSK = (1<<OCIE1A); //Enable timer1 overflow interrupt(TOIE1)
-	OCR1A = 12499;
-	/* Set ADCSRA ( ADC sample rate ) to 32 prescale = 4MHz/32 = 125KHz */
-	ADCSRA |= (1 << ADPS2) | (1 << ADPS0);
-
-	/* Set ADC reference voltage to AVCC */
-	ADMUX = (1 << REFS0);
-
-	/* Select Pin A7 */
-	ADMUX |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
-
-	/* Enable the ADC */
-	ADCSRA |= 1<<ADEN | 0<<ADSC;
-
-	sei();//Enable global interrupts
-
-
-    unsigned int writeAddress = 0;
-    unsigned int readAddress = 0;
-    unsigned char data[3];
-    unsigned int noteCount = 0;
-	unsigned int notePlay = 0;
-	uint16_t time = 0;
-	float modifier;
-
-    
-	while(1){
-		if(isRecordOn()){
-		USART_Init(0x07);
-			writeAddress = 0;
-			noteCount = 0;
-			TCNT1 = 0;
-			USART_Flush();
-            notePlay = 0;
-            time =0;
-            //reset address at start of record
-            //record until eeprom is full or is switched off
-            while((writeAddress<1022U) && isRecordOn()){
-                for(unsigned int i=0;i<3;i++){
-                    //store each of the three MIDI bytes in EEPROM	
-					data[i] = USART_Receive();
-                    EEPROM_Write(writeAddress,data[i]);
-					writeAddress++;
-					if(i==2){
-						EEPROM_Write(1023,noteCount++);
-						time=TCNT1;
-						EEPROM_Write(writeAddress++,(time));
-                    	EEPROM_Write(writeAddress++,time>>8);
-						TCNT1 = 0;
-					}
-					//at the end of the midi signal add the timing info to the next two bytes in eeprom
-                    PORTB = data[1];
-        		}
-    		}
-		}
-
-        if(isPlayOn()){
-		    USART_Init(0x07);
-		    readAddress = 0;
-			notePlay=0;
-			noteCount=EEPROM_Read(1023);
-			USART_Flush();
-			time = 0;
-		
-            while (notePlay < noteCount && isPlayOn()){
-			    //read each of the three MIDI bytes from the EEPROM
-				for(unsigned int j=0;j<3;j++){
-                	data[j] = EEPROM_Read(readAddress);
-					USART_Transmit(EEPROM_Read(readAddress));
-					readAddress++;
-                }
-				//creating a 16 bit time value from 2 eeprom bytes (the second note)
-				time = EEPROM_Read(readAddress+5)|(EEPROM_Read(readAddress+6)<<8);
-				if(isModifyOn()){
-					modifier = ADCRead(PINA & (1 << PA6));
-					modifier = 2 * (modifier / 1024);
-					time *= modifier;
-				}	
-					//delay by found time
-					TCNT1 = 0;
-					while(TCNT1<time){}
-					readAddress+=2;
-
-				PORTB = data[1];
-				notePlay++;
-            }
-			// Causes extra light flash
-			_delay_ms(1000);
-        }
-		    PORTB = 0;
-    }
-}
