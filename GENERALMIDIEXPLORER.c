@@ -1,7 +1,7 @@
 /* Name: Samuel Burgess
- *		 Justin Forgue
- *		 Aric Pennington
- *		 Elias Phillips
+ *	 Justin Forgue
+ *	 Aric Pennington
+ *	 Elias Phillips
  * Date: 10/29/2018
  * Course Number: ECE353
  * Course Name: Computer Systems Lab 1
@@ -33,16 +33,16 @@ int main(void){
     unsigned int readAddress = 0;
     unsigned char data[3];
     unsigned int noteCount = 0;
-	unsigned int notePlay = 0;
-	uint16_t time = 0;
-	float modifier;
-	
-	/* Initialize all of the ports and baud rate */
+    unsigned int notePlay = 0;
+    uint16_t time = 0;
+    float modifier;
+
+	/* Initialize all of the ports and baud rate */ 
 	USART_Init(baud);
-    USART_Flush();
+	USART_Flush();
 	port_Init();
 
-    /* Start up the device to run forever */
+    	/* Start up the device to run forever */
 	while(1){
 		
 		/* Record mode set on */
@@ -64,7 +64,7 @@ int main(void){
 			 */
             while((writeAddress<1022U) && isRecordOn()){
                 
-				/* Store each of the three MIDI bytes in EEPROM	*/
+			/* Store each of the three MIDI bytes in EEPROM	*/
 				for(unsigned int i=0;i<3;i++){
 					data[i] = USART_Receive();
                     EEPROM_Write(writeAddress,data[i]);
