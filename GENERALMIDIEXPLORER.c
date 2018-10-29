@@ -1,7 +1,7 @@
 /* Name: Samuel Burgess
- *	 Justin Forgue
- *	 Aric Pennington
- *	 Elias Phillips
+ *	 	 Justin Forgue
+ *		 Aric Pennington
+ *		 Elias Phillips
  * Date: 10/29/2018
  * Course Number: ECE353
  * Course Name: Computer Systems Lab 1
@@ -42,7 +42,7 @@ int main(void){
 	USART_Flush();
 	port_Init();
 
-    	/* Start up the device to run forever */
+    /* Start up the device to run forever */
 	while(1){
 		
 		/* Record mode set on */
@@ -72,7 +72,10 @@ int main(void){
 					
 					/* At the third byte of data records the timing data into the eeprom */
 					if(i==2){
+
+						/* Write the amount of notes played to the end of the eeprom */
 						EEPROM_Write(1023,noteCount++);
+					
 						time=TCNT1;
 						EEPROM_Write(writeAddress++,(time));
                     	EEPROM_Write(writeAddress++,time>>8);
@@ -131,8 +134,6 @@ int main(void){
 				PORTB = data[1];
 				notePlay++;
             }
-			// Causes extra light flash
-			_delay_ms(1000);
         }
 		PORTB = 0;
     }
@@ -147,16 +148,16 @@ int main(void){
  *   returns: returns nothing
  */
 void USART_Init(unsigned int baud){
-    /* Assign upper part of baud number (bits 8 to 11) */
+    /* Assign bits 8 to 11 of buad */
     UBRRH = (unsigned char)(baud>>8);
 
-    /* Assign remaining baud number */
+    /* Assign remaining baud */
     UBRRL = (unsigned char)baud;
 
     /* Enable receiver and transmitter */
     UCSRB = (1<<RXEN)|(1<<TXEN);
 
-    /* Initialize to 8 data bits 1 stop bit */
+    /* Initialize to 8 data bits and 1 stop bit */
     UCSRC = (1<<URSEL)|(3<<UCSZ0);
 
 }
@@ -186,20 +187,20 @@ void port_Init(){
 	/* Timer set to zero */
 	TCNT1 = 0;		
 	
-	/* Enable timer1 overflow interrupt(TOIE1) */
+	/* Enable Timer1 Output CompareA Match Interrupt */
 	TIMSK = (1<<OCIE1A); 
 	OCR1A = 12499;
 
-	/* Set ADCSRA ( ADC sample rate ) to 32 prescale = 4MHz/32 = 125KHz */
+	/* Set ADCSRA to prescale value */
 	ADCSRA |= (1 << ADPS2) | (1 << ADPS0);
 
-	/* Set ADC reference voltage to AVCC */
+	/* Set ADC ref voltage */
 	ADMUX = (1 << REFS0);
 
-	/* Select Pin A7 */
+	/* Use the pin A7 */
 	ADMUX |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
 
-	/* Enable the ADC */
+	/* Turn on ADC read */
 	ADCSRA |= 1<<ADEN | 0<<ADSC;
 
 	/* Enable global interrupts */
@@ -226,14 +227,14 @@ ISR(TIMER1_COMPA_vect){
  *
  *   returns: analog voltage
  */
-unsigned int ADCRead (unsigned int volt) {
-	/* ADMUX already set to reference voltage (AVCC) */
-	ADMUX |= volt;
+unsigned int ADCRead (unsigned int voltage) {
+	/* Set mux to ref voltage */
+	ADMUX |= voltage;
 
-	/* Begin Analog to Digital conversion */
+	/* Convert analog to digital */
 	ADCSRA |= 1 << ADSC;
 
-	/* Wait until the conversion has been finished */
+	/* Do nothing until converted from analog to digital */
 	while(ADCSRA & (1<<ADSC)) {  }
 
 	return ADC;
@@ -383,6 +384,6 @@ void USART_Transmit(unsigned char data){
  *   returns: returns nothing
  */
 void USART_Flush(void){
-    unsigned char dummy;
-    while (UCSRA & (1<<RXC)) dummy = UDR;
+    unsigned char temp;
+    while (UCSRA & (1<<RXC)) temp = UDR;
 }
